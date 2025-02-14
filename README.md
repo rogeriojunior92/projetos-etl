@@ -25,5 +25,3 @@ O **Power BI** será utilizado para criar dashboards interativos e relatórios, 
 
 ### 🐳 **Docker Compose – Gerenciamento de Contêineres**
 **Docker Compose** será utilizado para orquestrar e gerenciar os contêineres necessários para o projeto, incluindo o **Airflow**, **MinIO** e **SQLite**. O Docker Compose garante que todos os componentes da pipeline sejam inicializados corretamente, funcionando de maneira coesa e isolada.
-
-**Docker Compose** será utilizado para orquestrar e gerenciar os contêineres necessários para o projeto, incluindo o **Airflow**, **MinIO** e **SQLite**. O Docker Compose garante que todos os componentes da pipeline sejam inicializados corretamente, funcionando de maneira coesa e isolada.
