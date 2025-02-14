@@ -24,8 +24,6 @@ O banco de dados **SQLite** será utilizado para armazenar os dados após as tra
 O **Power BI** será utilizado para criar dashboards interativos e relatórios, permitindo visualizações dinâmicas e acessíveis sobre os dados processados.
 
 ### 🐳 **Docker Compose – Gerenciamento de Contêineres**
-<<<<<<< HEAD
 **Docker Compose** será utilizado para orquestrar e gerenciar os contêineres necessários para o projeto, incluindo o **Airflow**, **MinIO** e **SQLite**. O Docker Compose garante que todos os componentes da pipeline sejam inicializados corretamente, funcionando de maneira coesa e isolada.
-=======
+
 **Docker Compose** será utilizado para orquestrar e gerenciar os contêineres necessários para o projeto, incluindo o **Airflow**, **MinIO** e **SQLite**. O Docker Compose garante que todos os componentes da pipeline sejam inicializados corretamente, funcionando de maneira coesa e isolada.
->>>>>>> 85bc776656f7e7ba38225cfdb0fdb571eb8f1fbe
