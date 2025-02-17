@@ -1,1 +1,9 @@
+<<<<<<< HEAD
 logs/
+=======
+# Logs
+logs/
+
+# Environments
+dags/bronze/database/datalake.db
+>>>>>>> df3ebd4 (Commit inicial...)
