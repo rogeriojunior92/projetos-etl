@@ -97,7 +97,16 @@ def download_and_upload_to_minio(base_url, bucket_name, object_name):
 # Função para criação da tabela
 #=============================================================================
 def create_table():
+    """
+    Retorna a instrução SQL para criar a tabela 'raw_financial_sample' no PostgreSQL.
 
+    Esta função cria a definição SQL necessária para criar a tabela no banco de dados 
+    PostgreSQL, caso ela não exista. A tabela é utilizada para armazenar dados financeiros 
+    de amostras.
+
+    Returns:
+        str: A instrução SQL que pode ser executada no PostgreSQL.
+    """
     create_table_sql = """
         CREATE TABLE IF NOT EXISTS datalake.raw_financial_sample (
             segment TEXT,
@@ -124,7 +133,19 @@ def create_table():
 # Função para carga dos dados no Postgres
 #=============================================================================
 def load_csv_to_postgres(bucket_name, object_name):
+    """
+    Carrega um arquivo CSV do MinIO e insere os dados no banco de dados PostgreSQL.
 
+    Esta função recupera um arquivo CSV armazenado no MinIO, o carrega em um DataFrame do 
+    Pandas, e insere os dados na tabela 'raw_financial_sample' no banco de dados PostgreSQL.
+
+    Args:
+        bucket_name (str): O nome do bucket do MinIO onde o arquivo está armazenado.
+        object_name (str): O nome do objeto (arquivo) dentro do bucket do MinIO.
+
+    Raises:
+        Exception: Caso ocorra um erro durante a leitura do arquivo ou na inserção dos dados no PostgreSQL.
+    """
     try:
         # Obter o arquivo do MinIO
         data = minio_client.get_object(bucket_name, object_name)
@@ -205,6 +226,7 @@ with DAG(
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
+    # Tarefa para carregar os dados ao banco de dados Postgres
     task_load_data_to_postgres = PythonOperator(
         task_id="task_load_data_to_postgres",
         python_callable=load_csv_to_postgres,
