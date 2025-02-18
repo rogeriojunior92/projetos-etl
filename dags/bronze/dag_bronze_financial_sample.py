@@ -96,7 +96,7 @@ def download_and_upload_to_minio(base_url, bucket_name, object_name):
 #=============================================================================
 # Função para criação da tabela
 #=============================================================================
-def create_table():
+def create_raw_table():
     """
     Retorna a instrução SQL para criar a tabela 'raw_financial_sample' no PostgreSQL.
 
@@ -197,7 +197,7 @@ default_args = {
 # DAG Settings
 #=============================================================================
 with DAG(
-    dag_id="dag_extract_raw_financial_sample",
+    dag_id="dag_raw_extract_financial_sample",
     description="DAG RAW EXTRACT DATA FINANCIAL SAMPLE",
     default_args=default_args,
     schedule_interval=None,
@@ -221,7 +221,7 @@ with DAG(
     # Tarefa para criar a tabela
     task_create_table = PostgresOperator(
         task_id="task_create_table",
-        sql=create_table(),
+        sql=create_raw_table(),
         postgres_conn_id="postgres_default",
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
