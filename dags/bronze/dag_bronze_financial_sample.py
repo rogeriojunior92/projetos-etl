@@ -197,11 +197,11 @@ default_args = {
 # DAG Settings
 #=============================================================================
 with DAG(
-    dag_id="dag_raw_extract_financial_sample",
-    description="DAG RAW EXTRACT DATA FINANCIAL SAMPLE",
+    dag_id="dag_bronze_extract_financial_sample",
+    description="DAG BRONZE EXTRACT DATA FINANCIAL SAMPLE",
     default_args=default_args,
     schedule_interval=None,
-    tags=["DAG", "RAW", "EXTRACT", "FINANCIAL", "SAMPLE", "DATA"]
+    tags=["DAG", "BRONZE", "EXTRACT", "DATA", "FINANCIAL", "SAMPLE"]
 ) as dag:
 
     # Inicio da DAG

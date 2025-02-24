@@ -1,8 +1,6 @@
 import io
 import os
 import logging
-import tempfile
-import requests
 import pandas as pd
 from minio import Minio
 from datetime import datetime
@@ -41,42 +39,52 @@ logging.info(f"Acessando o MinIO com access_key={Variable.get('access_key_minio'
 #=============================================================================
 # Função para ler os dados RAW
 #=============================================================================
-def read_bronze_data_from_minio(bucket_name, object_name):
-    
+def read_bronze_data_from_minio(bucket_name, object_name, **kwargs):
+
     try:
         # Obter o arquivo do MinIO
         data = minio_client.get_object(bucket_name, object_name)
-
         file_content = data.read()
-        df_raw_financial_sample = pd.read_excel(io.BytesIO(file_content))
-        print(df_raw_financial_sample.dtypes)
-        return df_raw_financial_sample
+
+        # Ler os dados como DataFrame
+        df_bronze_financial_sample = pd.read_excel(io.BytesIO(file_content))
+
+        # Serializar o DataFrame como JSON para passar via XCom
+        df_json = df_bronze_financial_sample.to_json(orient='split')
+
+        # Passar o DataFrame serializado via XCom
+        kwargs["ti"].xcom_push(key="bronze_data", value=df_json)
+
+        return df_bronze_financial_sample
 
     except Exception as e:
         logging.error(f"Falha na leitura do arquivo: {e}")
+        raise
 
 #=============================================================================
 # Função para transformar os dados
 #=============================================================================
-def clean_and_transform_bronze_data(df_raw_financial_sample):
-    """
-    Função para limpar e transformar os dados financeiros brutos.
-    Args:
-        df_raw_financial_sample (pd.DataFrame): Dados financeiros brutos a serem transformados.
-    Returns:
-        pd.DataFrame: Dados transformados prontos para serem carregados.
-    """
-    try:
+def clean_and_transform_bronze_data(**kwargs):
 
-        # Limpando e transformando os dados
-        df_raw_financial_sample["Manufacturing Price"] = df_raw_financial_sample["Manufacturing Price"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["Sale Price"] = df_raw_financial_sample["Sale Price"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["Gross Sales"] = df_raw_financial_sample["Gross Sales"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["Discounts"] = df_raw_financial_sample["Discounts"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["Sales"] = df_raw_financial_sample["Sales"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["COGS"] = df_raw_financial_sample["COGS"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        df_raw_financial_sample["Profit"] = df_raw_financial_sample["Profit"].astype(str).str.replace('R\$', '').str.replace(',', '').astype(float)
-        # df_raw_financial_sample = df_raw_financial_sample.rename(columns=lambda x: x.strip()) # Renomear as colunas removendo espaços extras
+    try:
+        # Obter o DataFrame serializado do XCom
+        ti = kwargs['ti']
+        df_json = ti.xcom_pull(task_ids='task_read_bronze_data_from_minio', key='bronze_data')
+        
+        # Deserializar o DataFrame de volta de JSON
+        df_bronze_financial_sample = pd.read_json(df_json, orient='split')
+
+        # Remover espaços dos nomes das colunas
+        df_bronze_financial_sample.columns = df_bronze_financial_sample.columns.str.strip()
+
+        # Garantir que as colunas sejam do tipo string antes de usar .str
+        df_bronze_financial_sample["Manufacturing Price"] = df_bronze_financial_sample["Manufacturing Price"].astype(str).str.replace('$', '').str.replace(',', '')
+        df_bronze_financial_sample["Sale Price"] = df_bronze_financial_sample["Sale Price"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
+        df_bronze_financial_sample["Gross Sales"] = df_bronze_financial_sample["Gross Sales"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
+        df_bronze_financial_sample["Discounts"] = df_bronze_financial_sample["Discounts"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
+        df_bronze_financial_sample["Sales"] = df_bronze_financial_sample["Sales"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
+        df_bronze_financial_sample["COGS"] = df_bronze_financial_sample["COGS"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
+        df_bronze_financial_sample["Profit"] = df_bronze_financial_sample["Profit"].astype(str).str.replace('R$', '').str.replace(',', '').astype(float)
 
         # Renomeando as colunas
         rename_columns = {
@@ -97,21 +105,47 @@ def clean_and_transform_bronze_data(df_raw_financial_sample):
             "Month Name": "month_name",
             "Year": "year"
         }
-        df_raw_financial_sample.rename(columns=rename_columns, inplace=True)
+        df_bronze_financial_sample.rename(columns=rename_columns, inplace=True)
+
+        # Serializar novamente para JSON
+        df_json_transformed = df_bronze_financial_sample.to_json(orient='split')
+
+        # Passar os dados transformados para o XCom
+        ti.xcom_push(key="transformed_data", value=df_json_transformed)
         
-        logging.info("Transformação dos dados concluída com sucesso.")
-        return df_raw_financial_sample
+        # Retornar o DataFrame transformado
+        return df_bronze_financial_sample
 
     except Exception as e:
         logging.error(f"Falha durante a transformação dos dados: {e}")
-        raise 
-        
+        raise
+
 #=============================================================================
 # Função para salvar dataframe na camada bronze
 #=============================================================================
-def save_transformed_data_to_silver_layer():
-    pass
+def save_transformed_data_to_silver_layer(**kwargs):
+    
+    try:
+        # Recuperar o DataFrame serializado do XCom
+        ti = kwargs["ti"]
+        df_json = ti.xcom_pull(task_ids="task_clean_and_transform_bronze_data", key="transformed_data")
 
+        # Deserializar o JSON de volta para um DataFrame
+        df_bronze_financial_sample = pd.read_json(df_json, orient="split")
+
+        # Criar um buffer de memória para salvar o arquivo Parquet
+        parquet_buffer = io.BytesIO()
+
+        # Enviar o arquivo Parquet para o MinIO
+        parquet_buffer.seek(0)
+        df_bronze_financial_sample.to_parquet(parquet_buffer, index=False, engine="pyarrow")
+
+        minio_client.put_object("processed", "transformed_financial_sample.parquet", parquet_buffer, len(parquet_buffer.getvalue()))
+        logging.info(f"Arquivo Parquet carregado com sucesso para o bucket 'processed' no MinIO.")
+
+    except Exception as e:
+        logging.error(f"Falha ao salvar o arquivo no MinIO: {e}")
+        raise
 
 #=============================================================================
 # Função para criar tabela
@@ -156,13 +190,21 @@ with DAG(
         task_id="task_read_bronze_data_from_minio",
         python_callable=read_bronze_data_from_minio,
         op_args=["raw", "financial_sample.xlsx"],
+        provide_context=True,
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
     task_clean_and_transform_bronze_data = PythonOperator(
         task_id="task_clean_and_transform_bronze_data",
         python_callable=clean_and_transform_bronze_data,
-        op_args=["{{ task_instance.xcom_pull(task_ids='task_read_bronze_data_from_minio') }}"],
+        provide_context=True,
+        trigger_rule=TriggerRule.ALL_SUCCESS
+    )
+
+    task_save_transformed_data_to_silver_layer = PythonOperator(
+        task_id="save_transformed_data_to_silver_layer",
+        python_callable=save_transformed_data_to_silver_layer,
+        provide_context=True,
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
@@ -173,4 +215,4 @@ with DAG(
     )
 
     # Definição do fluxo da DAG
-    task_start >> task_read_bronze_data_from_minio >> task_clean_and_transform_bronze_data >> task_finish
+    task_start >> task_read_bronze_data_from_minio >> task_clean_and_transform_bronze_data >> task_save_transformed_data_to_silver_layer >> task_finish
