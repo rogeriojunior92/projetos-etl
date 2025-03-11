@@ -14,15 +14,6 @@ from airflow.hooks.postgres_hook import PostgresHook
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.postgres_operator import PostgresOperator
 
-"""
-Passo a passo
-1. Ler os dados da camada raw 
-2. Limpeza e transformação dos dados
-3. Salvar dataframe transformado na camada bronze
-4. Criar a tabela
-5. Inserir registros na tabela
-"""
-
 #=============================================================================
 # Configuração do MinIO
 #=============================================================================
@@ -112,7 +103,7 @@ def clean_and_transform_bronze_data(**kwargs):
 
         # Passar os dados transformados para o XCom
         ti.xcom_push(key="transformed_data", value=df_json_transformed)
-        
+
         # Retornar o DataFrame transformado
         return df_bronze_financial_sample
 
@@ -132,15 +123,23 @@ def save_transformed_data_to_silver_layer(**kwargs):
 
         # Deserializar o JSON de volta para um DataFrame
         df_bronze_financial_sample = pd.read_json(df_json, orient="split")
-
+        if df_bronze_financial_sample.empty:
+            logging.error("O DataFrame está vazio.")
+            raise ValueError("DataFrame vazio")
+                             
         # Criar um buffer de memória para salvar o arquivo Parquet
         parquet_buffer = io.BytesIO()
+        if parquet_buffer.tell() == 0:
+            logging.info("O buffer está vazio.")
+        else:
+            logging.error(f"O buffer contém {parquet_buffer.tell()} bytes.")
 
         # Enviar o arquivo Parquet para o MinIO
-        parquet_buffer.seek(0)
         df_bronze_financial_sample.to_parquet(parquet_buffer, index=False, engine="pyarrow")
 
-        minio_client.put_object("processed", "transformed_financial_sample.parquet", parquet_buffer, len(parquet_buffer.getvalue()))
+        parquet_buffer.seek(0)
+
+        minio_client.put_object("processed", "transformed_financial_sample", parquet_buffer, len(parquet_buffer.getvalue()))
         logging.info(f"Arquivo Parquet carregado com sucesso para o bucket 'processed' no MinIO.")
 
     except Exception as e:
